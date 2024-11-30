@@ -1,0 +1,28 @@
+{
+    "acoes": [
+        {
+            "nome": "enfermeira",
+            "funcoes": ["chamar", "cancelar"]
+        },
+        {
+            "nome": "luz",
+            "funcoes": ["ligar", "desligar"]
+        },
+        {
+            "nome": "lâmpada",
+            "funcoes": ["ligar", "desligar"]
+        },
+        {
+            "nome": "ar",
+            "funcoes": ["ajustar", "ligar", "desligar", "definir", "temperatura"]
+        },
+        {
+            "nome": "tv",
+            "funcoes": ["ligar", "desligar"]
+        },
+        {
+            "nome": "televisão",
+            "funcoes": ["ligar", "desligar"]
+        }
+    ]
+}
