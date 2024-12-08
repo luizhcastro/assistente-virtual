@@ -18,7 +18,7 @@ ATUADORES = {
         "iniciar": iniciar_dispositivos,
         "atuar": atuar_sobre_dispositivos,
     },
-    "lâmpada": {
+    "lampada": {
         "iniciar": iniciar_dispositivos,
         "atuar": atuar_sobre_dispositivos,
     },
@@ -36,132 +36,106 @@ ATUADORES = {
     },
 }
 
-def iniciar():
-    global reconhecedor
-    iniciado = False
-    global acoes
-    global palavras_de_parada
-    
-    reconhecedor = sr.Recognizer()
-    palavras_de_parada = set(corpus.stopwords.words(IDIOMA_CORPUS))
-
+def carregar_configuracao():
     try:
-        with open(CAMINHO_CONFIGURACAO, "r") as arquivo_de_configuracao:
-            configuracao = json.load(arquivo_de_configuracao)
-            acoes = configuracao["acoes"]
-            arquivo_de_configuracao.close()
-
-        iniciado = True
+        with open(CAMINHO_CONFIGURACAO, "r", encoding='utf-8') as arquivo:
+            return json.load(arquivo)
     except FileNotFoundError:
         print("Arquivo de configuração não encontrado!")
-        return False, None, None
+        return None
+    except json.JSONDecodeError:
+        print("Erro ao ler arquivo de configuração!")
+        return None
 
+def iniciar():
+    global reconhecedor, palavras_de_parada
     
-    for dispositivo, dados in ATUADORES.items():
-        parametros = dados["iniciar"]()
-        dados["parametros"] = parametros
 
-    return iniciado, reconhecedor, acoes
+    reconhecedor = sr.Recognizer()
+    reconhecedor.dynamic_energy_threshold = True
+    reconhecedor.energy_threshold = 4000
+    
+
+    palavras_de_parada = set(corpus.stopwords.words(IDIOMA_CORPUS))
+    
+
+    configuracao = carregar_configuracao()
+    if not configuracao:
+        return False, None, None
+    
+
+    for dispositivo, dados in ATUADORES.items():
+        dados["parametros"] = dados["iniciar"]()
+
+    return True, reconhecedor, configuracao["acoes"]
 
 def escutar_fala(reconhecedor):
-    tem_fala = False
-    fala = None
-
     with sr.Microphone() as fonte_de_audio:
-        reconhecedor.adjust_for_ambient_noise(fonte_de_audio)  # Ajuste para o ruído ambiente
         print("\nOuvindo... Fale seu comando!")
-        
         try:
-            fala = reconhecedor.listen(fonte_de_audio, timeout=5)
-            tem_fala = True
-            print("Fala detectada!")  # Confirma que algo foi capturado
-        except sr.UnknownValueError:
+            reconhecedor.adjust_for_ambient_noise(fonte_de_audio, duration=1)
+            fala = reconhecedor.listen(fonte_de_audio, timeout=5, phrase_time_limit=5)
+            print("Fala detectada!")
+            return True, fala
+        except (sr.UnknownValueError, sr.WaitTimeoutError):
             print("Não consegui ouvir nada!")
-        except sr.WaitTimeoutError:
-            print("Tempo de espera excedido!")
-    
-    return tem_fala, fala
+            return False, None
 
 def transcrever_fala(fala, reconhecedor):
-    tem_transcricao = False
-    transcricao = None
-    
     try:
         transcricao = reconhecedor.recognize_google(fala, language=IDIOMA_FALA)
-        tem_transcricao = True
-        print(f"Comando detectado: {transcricao}")  # Imprime a transcrição
+        print(f"Comando detectado: {transcricao}")
+        return True, transcricao.lower()
     except sr.UnknownValueError:
         print("Não entendi o comando. Pode repetir?")
-    
-    return tem_transcricao, transcricao.lower() if transcricao else None
+        return False, None
 
-def tokenizar_transcricao(transcricao):
+def tokenizar_e_filtrar(transcricao):
     tokens = word_tokenize(transcricao)
-    print(f"Tokens: {tokens}")  # Exibe os tokens gerados
-    return tokens
-
-def validar_comando(tokens, acoes):
-    valido, dispositivo, funcao, parametros = False, None, None, None
-
-    for i, token in enumerate(tokens):
-        for acao in acoes:
-            if token == acao["nome"]:
-                dispositivo = token
-                # Verificar função
-                for funcao_possivel in acao["funcoes"]:
-                    if funcao_possivel in tokens[i + 1:]:
-                        funcao = funcao_possivel
-                        parametros = ' '.join(tokens[i + 2:])
-                        valido = True
-                        break
-                if valido:
-                    break
-
-    return valido, dispositivo, funcao, parametros
-
-
-
-def executar_comando(dispositivo, funcao, parametros):
-    print(f"Executando: {dispositivo} - {funcao}")
-    if dispositivo in ATUADORES:
-        atuador = ATUADORES[dispositivo]
-        parametros_de_atuacao = atuador["parametros"]
-        processo_paralelo = Thread(
-            target=atuador["atuar"],
-            args=[dispositivo, funcao, parametros_de_atuacao, parametros]
-        )
-        processo_paralelo.start()
-    else:
-        print(f"Dispositivo '{dispositivo}' não encontrado.")
-
-def eliminar_palavras_de_parada(tokens):
-    global palavras_de_parada
     tokens_filtrados = [token for token in tokens if token not in palavras_de_parada]
-    print(f"Tokens após remoção das palavras de parada: {tokens_filtrados}")  # Exibe tokens após filtragem
+    print(f"Tokens processados: {tokens_filtrados}")
     return tokens_filtrados
 
-palavras_de_parada = set(corpus.stopwords.words(IDIOMA_CORPUS))
+def encontrar_comando(tokens, acoes):
+    for token in tokens:
+        for acao in acoes:
+            if token == acao["nome"]:
+                for funcao in acao["funcoes"]:
+                    if funcao in tokens:
+                        inicio_params = tokens.index(funcao) + 1
+                        parametros = " ".join(tokens[inicio_params:])
+                        return True, token, funcao, parametros
+    return False, None, None, None
+
+def executar_comando(dispositivo, funcao, parametros):
+    print(f"Executando comando: {dispositivo} - {funcao} - Parâmetros: {parametros}")
+    if dispositivo in ATUADORES:
+        atuador = ATUADORES[dispositivo]
+        Thread(
+            target=atuador["atuar"],
+            args=[dispositivo, funcao, atuador["parametros"], parametros]
+        ).start()
+    else:
+        print(f"Dispositivo '{dispositivo}' não encontrado.")
 
 
 if __name__ == "__main__":
     iniciado, reconhecedor, acoes = iniciar()
-
-    if iniciado:
-        print("Assistente Virtual iniciada!")
-        print("Comandos disponíveis:")
-        for acao in acoes:
-            print(f"- {acao['nome']} [{ ' | '.join(acao['funcoes']) }]")
         
-        while True:
-            tem_fala, fala = escutar_fala(reconhecedor)
-            if tem_fala:
-                tem_transcricao, transcricao = transcrever_fala(fala, reconhecedor)
-                if tem_transcricao:
-                    tokens = tokenizar_transcricao(transcricao)
-                    tokens = eliminar_palavras_de_parada(tokens)
-
-                    valido, dispositivo, funcao, parametros = validar_comando(tokens, acoes)
-                    if valido:
-                        executar_comando(dispositivo, funcao, parametros)
-                    else:
-                        print("Comando inválido, por favor tente novamente")
+    print("\nAssistente Virtual iniciada!")
+    print("Comandos disponíveis:")
+    for acao in acoes:
+        print(f"- {acao['nome']}: {', '.join(acao['funcoes'])}")
+    
+    while True:
+        tem_fala, fala = escutar_fala(reconhecedor)
+        if tem_fala:
+            tem_transcricao, transcricao = transcrever_fala(fala, reconhecedor)
+            if tem_transcricao:
+                tokens = tokenizar_e_filtrar(transcricao)
+                valido, dispositivo, funcao, parametros = encontrar_comando(tokens, acoes)
+                
+                if valido:
+                    executar_comando(dispositivo, funcao, parametros)
+                else:
+                    print("Comando não reconhecido. Por favor, tente novamente.")

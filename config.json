@@ -9,12 +9,8 @@
             "funcoes": ["ligar", "desligar"]
         },
         {
-            "nome": "lâmpada",
+            "nome": "lampada",
             "funcoes": ["ligar", "desligar"]
-        },
-        {
-            "nome": "ar",
-            "funcoes": ["ajustar", "ligar", "desligar", "definir", "temperatura"]
         },
         {
             "nome": "tv",
@@ -23,6 +19,10 @@
         {
             "nome": "televisão",
             "funcoes": ["ligar", "desligar"]
+        },
+        {
+            "nome": "ar",
+            "funcoes": ["ligar", "desligar", "ajustar", "definir", "aumentar", "diminuir"]
         }
     ]
 }
