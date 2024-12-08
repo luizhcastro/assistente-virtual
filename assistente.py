@@ -18,7 +18,7 @@ ATUADORES = {
         "iniciar": iniciar_dispositivos,
         "atuar": atuar_sobre_dispositivos,
     },
-    "lampada": {
+    "lâmpada": {
         "iniciar": iniciar_dispositivos,
         "atuar": atuar_sobre_dispositivos,
     },
@@ -97,24 +97,37 @@ def tokenizar_e_filtrar(transcricao):
     return tokens_filtrados
 
 def encontrar_comando(tokens, acoes):
-    for token in tokens:
-        for acao in acoes:
-            if token == acao["nome"]:
-                for funcao in acao["funcoes"]:
-                    if funcao in tokens:
+    for acao in acoes:
+        if acao["nome"] in tokens:
+            dispositivo = acao["nome"]
+            for funcao in acao["funcoes"]:
+                if funcao in tokens:
+                    if funcao in ["ajustar", "definir", "aumentar", "diminuir"]:
+                        parametros = ""
+                        for token in tokens[tokens.index(funcao):]:
+                            if token.isdigit():
+                                parametros = token
+                                break
+                    else:
                         inicio_params = tokens.index(funcao) + 1
                         parametros = " ".join(tokens[inicio_params:])
-                        return True, token, funcao, parametros
+                    
+                    return True, dispositivo, funcao, parametros
     return False, None, None, None
 
 def executar_comando(dispositivo, funcao, parametros):
     print(f"Executando comando: {dispositivo} - {funcao} - Parâmetros: {parametros}")
     if dispositivo in ATUADORES:
         atuador = ATUADORES[dispositivo]
+        params = atuador["parametros"]
         Thread(
             target=atuador["atuar"],
-            args=[dispositivo, funcao, atuador["parametros"], parametros]
+            args=[dispositivo, funcao, params, parametros],
+            daemon=True 
         ).start()
+        
+        import time
+        time.sleep(0.1)
     else:
         print(f"Dispositivo '{dispositivo}' não encontrado.")
 
