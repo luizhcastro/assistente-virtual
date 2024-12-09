@@ -1,15 +1,14 @@
-from datetime import datetime
-
-def iniciar_chamado_enfermeira():
-    print("Sistema de chamado de enfermeira iniciado")
-    return {"ultimo_chamado": None}
-
-def atuar_sobre_chamado(acao, funcao, parametros, valor_parametro):
+def atuar_sobre_chamado(dispositivo, funcao, params, valor_parametro):
+    from datetime import datetime
     hora_atual = datetime.now().strftime("%H:%M:%S")
-    
+
     if funcao == "chamar":
         print(f"[{hora_atual}] Chamando enfermeira... Solicitação enviada!")
-        parametros["ultimo_chamado"] = hora_atual
+        if params is not None: 
+            params["ultimo_chamado"] = hora_atual
     elif funcao == "cancelar":
-        print(f"[{hora_atual}] Cancelando chamado da enfermeira...")
-        parametros["ultimo_chamado"] = None
+        print(f"[{hora_atual}] Cancelando chamado da enfermeira.")
+        if params is not None:
+            params["ultimo_chamado"] = None
+    else:
+        print(f"Função desconhecida para o dispositivo '{dispositivo}'.")

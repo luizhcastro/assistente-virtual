@@ -1,8 +1,8 @@
 import speech_recognition as sr
-from nltk import word_tokenize, corpus
-from threading import Thread
+from nltk import word_tokenize
+from nltk.corpus import stopwords
 from enfermeira import *
-from dispositivos import *
+from dispositivos import controle
 import json
 
 IDIOMA_CORPUS = "portuguese"
@@ -11,30 +11,16 @@ CAMINHO_CONFIGURACAO = "./config.json"
 
 ATUADORES = {
     "enfermeira": {
-        "iniciar": iniciar_chamado_enfermeira,
+        "parametros": {"ultimo_chamado": None},  
         "atuar": atuar_sobre_chamado,
     },
-    "luz": {
-        "iniciar": iniciar_dispositivos,
-        "atuar": atuar_sobre_dispositivos,
-    },
-    "lâmpada": {
-        "iniciar": iniciar_dispositivos,
-        "atuar": atuar_sobre_dispositivos,
-    },
-    "ar": {
-        "iniciar": iniciar_dispositivos,
-        "atuar": atuar_sobre_dispositivos,
-    },
-    "tv": {
-        "iniciar": iniciar_dispositivos,
-        "atuar": atuar_sobre_dispositivos,
-    },
-    "televisão": {
-        "iniciar": iniciar_dispositivos,
-        "atuar": atuar_sobre_dispositivos,
-    },
+    "luz": {"atuar": lambda dispositivo, funcao, params, valor_parametro: controle.controlar_luz(funcao == "ligar")},
+    "lâmpada": {"atuar": lambda dispositivo, funcao, params, valor_parametro: controle.controlar_luz(funcao == "ligar")},
+    "ar": {"atuar": lambda dispositivo, funcao, params, valor_parametro: controle.controlar_ar(funcao, valor_parametro)},
+    "tv": {"atuar": lambda dispositivo, funcao, params, valor_parametro: controle.controlar_tv(funcao == "ligar")},
+    "televisão": {"atuar": lambda dispositivo, funcao, params, valor_parametro: controle.controlar_tv(funcao == "ligar")},
 }
+
 
 def carregar_configuracao():
     try:
@@ -49,24 +35,19 @@ def carregar_configuracao():
 
 def iniciar():
     global reconhecedor, palavras_de_parada
-    
 
     reconhecedor = sr.Recognizer()
     reconhecedor.dynamic_energy_threshold = True
     reconhecedor.energy_threshold = 4000
-    
 
-    palavras_de_parada = set(corpus.stopwords.words(IDIOMA_CORPUS))
-    
+    palavras_de_parada = set(stopwords.words(IDIOMA_CORPUS))
 
     configuracao = carregar_configuracao()
     if not configuracao:
         return False, None, None
-    
 
     for dispositivo, dados in ATUADORES.items():
-        dados["parametros"] = dados["iniciar"]()
-
+        dados["parametros"] = None
     return True, reconhecedor, configuracao["acoes"]
 
 def escutar_fala(reconhecedor):
@@ -91,6 +72,7 @@ def transcrever_fala(fala, reconhecedor):
         return False, None
 
 def tokenizar_e_filtrar(transcricao):
+    palavras_de_parada = set(stopwords.words(IDIOMA_CORPUS))
     tokens = word_tokenize(transcricao)
     tokens_filtrados = [token for token in tokens if token not in palavras_de_parada]
     print(f"Tokens processados: {tokens_filtrados}")
@@ -108,32 +90,24 @@ def encontrar_comando(tokens, acoes):
                     return True, dispositivo, funcao, parametros
     return False, None, None, None
 
-
 def executar_comando(dispositivo, funcao, parametros):
     print(f"Executando comando: {dispositivo} - {funcao} - Parâmetros: {parametros}")
     if dispositivo in ATUADORES:
         atuador = ATUADORES[dispositivo]
-        params = atuador["parametros"]
-        Thread(
-            target=atuador["atuar"],
-            args=[dispositivo, funcao, params, parametros],
-            daemon=True 
-        ).start()
-        
-        import time
-        time.sleep(0.1)
+        params = atuador.get("parametros", {})
+        atuador["atuar"](dispositivo, funcao, params, parametros)
     else:
         print(f"Dispositivo '{dispositivo}' não encontrado.")
 
 
 if __name__ == "__main__":
     iniciado, reconhecedor, acoes = iniciar()
-        
+
     print("\nAssistente Virtual iniciada!")
     print("Comandos disponíveis:")
     for acao in acoes:
         print(f"- {acao['nome']}: {', '.join(acao['funcoes'])}")
-    
+
     while True:
         tem_fala, fala = escutar_fala(reconhecedor)
         if tem_fala:
@@ -141,7 +115,7 @@ if __name__ == "__main__":
             if tem_transcricao:
                 tokens = tokenizar_e_filtrar(transcricao)
                 valido, dispositivo, funcao, parametros = encontrar_comando(tokens, acoes)
-                
+
                 if valido:
                     executar_comando(dispositivo, funcao, parametros)
                 else:

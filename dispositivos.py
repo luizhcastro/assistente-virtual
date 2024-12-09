@@ -41,15 +41,3 @@ class ControleDispositivos:
             print(f"Temperatura ajustada para {self.temperatura_ar}°C")
 
 controle = ControleDispositivos()
-
-def iniciar_dispositivos():
-    print("Sistema de controle de dispositivos iniciado")
-    return {"controle": controle}
-
-def atuar_sobre_dispositivos(dispositivo, funcao, parametros, valor_parametro):
-    if dispositivo in ["luz", "lampada"]:
-        controle.controlar_luz(funcao == "ligar")
-    elif dispositivo in ["tv", "televisão"]:
-        controle.controlar_tv(funcao == "ligar")
-    elif dispositivo == "ar":
-        controle.controlar_ar(funcao, valor_parametro)
