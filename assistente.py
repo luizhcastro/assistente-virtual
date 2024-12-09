@@ -98,22 +98,16 @@ def tokenizar_e_filtrar(transcricao):
 
 def encontrar_comando(tokens, acoes):
     for acao in acoes:
-        if acao["nome"] in tokens:
+        if acao["nome"] in tokens or ("temperatura" in tokens and acao["nome"] == "ar"):
             dispositivo = acao["nome"]
             for funcao in acao["funcoes"]:
                 if funcao in tokens:
+                    parametros = None
                     if funcao in ["ajustar", "definir", "aumentar", "diminuir"]:
-                        parametros = ""
-                        for token in tokens[tokens.index(funcao):]:
-                            if token.isdigit():
-                                parametros = token
-                                break
-                    else:
-                        inicio_params = tokens.index(funcao) + 1
-                        parametros = " ".join(tokens[inicio_params:])
-                    
+                        parametros = next((token for token in tokens if token.isdigit()), None)
                     return True, dispositivo, funcao, parametros
     return False, None, None, None
+
 
 def executar_comando(dispositivo, funcao, parametros):
     print(f"Executando comando: {dispositivo} - {funcao} - Parâmetros: {parametros}")

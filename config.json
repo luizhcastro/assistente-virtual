@@ -23,6 +23,10 @@
         {
             "nome": "ar",
             "funcoes": ["ligar", "desligar", "ajustar", "definir", "aumentar", "diminuir"]
+        },
+        {
+            "nome": "ar-condicionado",
+            "funcoes": ["ligar", "desligar", "ajustar", "definir", "aumentar", "diminuir"]
         }
     ]
 }

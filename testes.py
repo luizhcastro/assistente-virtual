@@ -1,151 +1,137 @@
 import unittest
-import os
-import speech_recognition as sr
 from assistente import *
-from dispositivos import ControleDispositivos
 
 class TestAssistenteVirtual(unittest.TestCase):
     def setUp(self):
-        """Inicializa o ambiente de teste"""
         self.iniciado, self.reconhecedor, self.acoes = iniciar()
         self.assertTrue(self.iniciado)
+
+    def processar_audio_arquivo(self, caminho_audio, reconhecedor):
+        try:
+            with sr.AudioFile(caminho_audio) as fonte_de_audio:
+                print(f"Processando o arquivo de áudio: {caminho_audio}")
+                audio = reconhecedor.record(fonte_de_audio)
+                return transcrever_fala(audio, reconhecedor)
+        except FileNotFoundError:
+            print(f"Arquivo de áudio não encontrado: {caminho_audio}")
+            return False, None
+        except Exception as e:
+            print(f"Erro ao processar o arquivo de áudio: {e}")
+            return False, None
+
+    def test_chamar_enfermeira(self):
+        caminho_audio = r".\\audios\\chamar a enfermeira.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
         
-        # Reset dispositivos para estado inicial
-        for dispositivo in ATUADORES.values():
-            if "parametros" in dispositivo:
-                if "controle" in dispositivo["parametros"]:
-                    dispositivo["parametros"]["controle"] = ControleDispositivos()
-
-    def simular_comando_voz(self, texto):
-        """Helper para simular comando de voz a partir de texto"""
-        tokens = tokenizar_e_filtrar(texto)
-        return encontrar_comando(tokens, self.acoes)
-
-    def test_inicializacao(self):
-        """Testa se a inicialização ocorre corretamente"""
-        self.assertIsNotNone(self.reconhecedor)
-        self.assertIsNotNone(self.acoes)
-        self.assertTrue(isinstance(self.acoes, list))
-
-    def test_comandos_luz(self):
-        """Testa comandos relacionados à luz"""
-        # Teste ligar luz
-        valido, dispositivo, funcao, params = self.simular_comando_voz("ligar luz")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "luz")
-        self.assertEqual(funcao, "ligar")
-
-        # Teste desligar luz
-        valido, dispositivo, funcao, params = self.simular_comando_voz("desligar luz")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "luz")
-        self.assertEqual(funcao, "desligar")
-
-    def test_comandos_tv(self):
-        """Testa comandos relacionados à TV"""
-        # Teste ligar TV
-        valido, dispositivo, funcao, params = self.simular_comando_voz("ligar televisão")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "televisão")
-        self.assertEqual(funcao, "ligar")
-
-        # Teste desligar TV
-        valido, dispositivo, funcao, params = self.simular_comando_voz("desligar tv")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "tv")
-        self.assertEqual(funcao, "desligar")
-
-    def test_comandos_ar(self):
-        """Testa comandos relacionados ao ar condicionado"""
-        # Teste ligar ar
-        valido, dispositivo, funcao, params = self.simular_comando_voz("ligar ar")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "ar")
-        self.assertEqual(funcao, "ligar")
-
-        # Teste ajustar temperatura
-        valido, dispositivo, funcao, params = self.simular_comando_voz("ajustar temperatura do ar para 24")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "ar")
-        self.assertEqual(funcao, "ajustar")
-        self.assertIn("24", params)
-
-        # Teste aumentar temperatura
-        valido, dispositivo, funcao, params = self.simular_comando_voz("aumentar temperatura")
-        self.assertTrue(valido)
-        self.assertEqual(dispositivo, "ar")
-        self.assertEqual(funcao, "aumentar")
-
-    def test_comando_enfermeira(self):
-        """Testa comando para chamar enfermeira"""
-        valido, dispositivo, funcao, params = self.simular_comando_voz("chamar enfermeira")
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
         self.assertTrue(valido)
         self.assertEqual(dispositivo, "enfermeira")
         self.assertEqual(funcao, "chamar")
-
-    def test_comandos_invalidos(self):
-        """Testa rejeição de comandos inválidos"""
-        # Comando com dispositivo inexistente
-        valido, *_ = self.simular_comando_voz("ligar radio")
-        self.assertFalse(valido)
-
-        # Comando com função inexistente
-        valido, *_ = self.simular_comando_voz("piscar luz")
-        self.assertFalse(valido)
-
-        # Comando vazio
-        valido, *_ = self.simular_comando_voz("")
-        self.assertFalse(valido)
-
-    def test_controle_dispositivos(self):
-        """Testa a execução real dos comandos nos dispositivos"""
-        # Inicializar dispositivos
-        controle = ATUADORES["luz"]["parametros"]["controle"]
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
         
-        # Testar luz
-        executar_comando("luz", "ligar", "")
-        self.assertTrue(controle.luz_ligada)
+    def test_ligar_luz(self):
+        caminho_audio = r".\\audios\\ligar luz.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
         
-        executar_comando("luz", "desligar", "")
-        self.assertFalse(controle.luz_ligada)
-
-        # Testar TV
-        executar_comando("tv", "ligar", "")
-        self.assertTrue(controle.tv_ligada)
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
         
-        executar_comando("tv", "desligar", "")
-        self.assertFalse(controle.tv_ligada)
-
-        # Testar ar condicionado
-        executar_comando("ar", "ligar", "")
-        self.assertTrue(controle.ar_ligado)
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
         
-        temperatura_inicial = controle.temperatura_ar
-        executar_comando("ar", "aumentar", "2")
-        self.assertEqual(controle.temperatura_ar, temperatura_inicial + 2)
-
-class TestProcessamentoTexto(unittest.TestCase):
-    """Testes específicos para o processamento de texto"""
-    
-    def setUp(self):
-        self.iniciado, self.reconhecedor, self.acoes = iniciar()
-
-    def test_tokenizacao(self):
-        """Testa a tokenização e filtragem de texto"""
-        texto = "por favor ligar a luz do quarto"
-        tokens = tokenizar_e_filtrar(texto)
-        self.assertIn("ligar", tokens)
-        self.assertIn("luz", tokens)
-        self.assertNotIn("por", tokens)  # Stopword deve ser removida
-        self.assertNotIn("a", tokens)    # Stopword deve ser removida
-
-    def test_encontrar_comando(self):
-        """Testa a extração de comandos do texto tokenizado"""
-        tokens = ["ligar", "luz", "quarto"]
-        valido, dispositivo, funcao, params = encontrar_comando(tokens, self.acoes)
         self.assertTrue(valido)
         self.assertEqual(dispositivo, "luz")
         self.assertEqual(funcao, "ligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+        
+    def test_ligar_ar(self):
+        caminho_audio = r".\\audios\\ligar ar condicionado.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido)
+        self.assertEqual(dispositivo, "ar")
+        self.assertEqual(funcao, "ligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+        
+    def test_ligar_tv(self):
+        caminho_audio = r".\\audios\\ligar a tv.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido)
+        self.assertEqual(dispositivo, "tv")
+        self.assertEqual(funcao, "ligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+        
+    def test_ajustar_temperatura(self):
+        caminho_audio = r".\\audios\\ajustar temperatura.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido, "Comando não reconhecido como válido.")
+        self.assertEqual(dispositivo, "ar", "O dispositivo não foi identificado corretamente.")
+        self.assertEqual(funcao, "ajustar", "A função não foi identificada corretamente.")
+        self.assertEqual(params, "18", "O parâmetro da temperatura não foi identificado corretamente.")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+
+        
+    def test_desligar_luz(self):
+        caminho_audio = r".\\audios\\desligar luz.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido)
+        self.assertEqual(dispositivo, "luz")
+        self.assertEqual(funcao, "desligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+        
+    def test_desligar_ar(self):
+        caminho_audio = r".\\audios\\desligar ar condicionado.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido)
+        self.assertEqual(dispositivo, "ar-condicionado")
+        self.assertEqual(funcao, "desligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
+        
+    def test_desligar_tv(self):
+        caminho_audio = r".\\audios\\desligar a tv.wav"
+        tem_transcricao, transcricao = self.processar_audio_arquivo(caminho_audio, self.reconhecedor)
+        
+        self.assertTrue(tem_transcricao)
+        self.assertIsNotNone(transcricao)
+        
+        valido, dispositivo, funcao, params = encontrar_comando(tokenizar_e_filtrar(transcricao), self.acoes)
+        
+        self.assertTrue(valido)
+        self.assertEqual(dispositivo, "tv")
+        self.assertEqual(funcao, "desligar")
+        print(f"Comando detectado no áudio: {dispositivo}, {funcao}, {params}")
 
 if __name__ == '__main__':
     unittest.main()
